@@ -30,11 +30,12 @@ export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGat
   }
 
   if (!user) {
-    logger.info('User does not exist.')
+    logger.info('User does not exist yet, so no todos will be returned;' +
+      'user will be officially created when the first todo is added.')
     return {
-      statusCode: 403,
+      statusCode: 201,
       body: JSON.stringify({
-        error: 'User does not exist'
+        items: []
       })
     }
   }

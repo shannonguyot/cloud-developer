@@ -7,6 +7,7 @@ const userAccess = new UserAccess()
 export async function userExists(authHeader: string): Promise<User> {
   const jwtToken = getToken(authHeader)
   const user: User = {id: parseUserId(jwtToken)}
+
   const exists = await userAccess.userExists(user.id)
 
   if(exists) {
@@ -21,7 +22,7 @@ export async function createUser(authHeader: string): Promise<User> {
   const user : User = {id: parseUserId(jwtToken)}
   const exists = await userAccess.userExists(user.id)
 
-  if(!exists) {
+  if(exists) {
     return user
   }
 
