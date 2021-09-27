@@ -42,6 +42,53 @@ export class TodoAccess {
     return true
   }
 
+  async updateTodo(key: any, name: string, dueDate: string) : Promise<boolean> {
+
+    let updateExp = "set "
+    let expAttrValues: object
+
+    if(name != "")
+    {
+      updateExp += "#todoName=:name"
+
+      if(dueDate != "")
+      {
+        updateExp += ",dueDate=:dueDate"
+        expAttrValues = {
+          ":name": name,
+          ":dueDate": dueDate
+        }
+      }
+      else {
+        expAttrValues = {
+          ":name": name
+        }
+      }
+    }
+    else if (dueDate != "")
+    {
+      updateExp += "dueDate=:dueDate"
+      expAttrValues = {
+        ":dueDate": dueDate
+      }
+    }
+
+    await this.docClient
+      .update({
+        TableName: this.todosTable,
+        Key: key,
+        UpdateExpression: updateExp,
+        ExpressionAttributeValues: expAttrValues,
+        ExpressionAttributeNames: {
+          "#todoName": "name"
+        },
+        ReturnValues:"UPDATED_NEW"
+      })
+      .promise()
+
+    return true
+  }
+
   async updateTodoUrl(key: any, todoId: string) : Promise<boolean> {
     await this.docClient
       .update({

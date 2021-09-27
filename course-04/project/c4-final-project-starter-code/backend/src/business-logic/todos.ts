@@ -23,6 +23,10 @@ export async function checkTodo(userId: string, createdAt: string, done: boolean
   return await todoAccess.checkTodo({userId, createdAt}, done)
 }
 
+export async function updateTodo(userId: string, createdAt: string, name: string, dueDate: string) : Promise<boolean> {
+  return await todoAccess.updateTodo({userId, createdAt}, name, dueDate)
+}
+
 export async function updateTodoUrl(userId: string, createdAt: string, todoId: string) : Promise<boolean> {
   return await todoAccess.updateTodoUrl({userId, createdAt}, todoId)
 }

@@ -1,22 +1,18 @@
 {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "title": "todo-update",
+    "title": "send-email",
     "type": "object",
     "properties": {
-      "name": {
+      "todoName": {
         "type": "string"
       },
-      "dueDate": {
+      "email": {
         "type": "string"
-      },
-      "done": {
-        "type": "boolean"
       }
     },
     "required": [
-      "name",
-      "dueDate",
-      "done"
+      "todoName",
+      "email"
     ],
     "additionalProperties": false
   }

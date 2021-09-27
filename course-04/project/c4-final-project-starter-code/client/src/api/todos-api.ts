@@ -3,6 +3,7 @@ import { Todo } from '../types/Todo';
 import { CreateTodoRequest } from '../types/CreateTodoRequest';
 import Axios from 'axios'
 import { UpdateTodoRequest } from '../types/UpdateTodoRequest';
+import { EmailNotificationRequest } from '../types/EmailNotificationRequest';
 
 export async function getTodos(idToken: string): Promise<Todo[]> {
   console.log('Fetching todos')
@@ -15,6 +16,30 @@ export async function getTodos(idToken: string): Promise<Todo[]> {
   })
   console.log('Todos:', response.data)
   return response.data.items
+}
+
+export async function getRemainingTodoCount(idToken: string): Promise<number> {
+  console.log('Fetching remaining todo count')
+
+  const response = await Axios.get(`${apiEndpoint}/count`, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+  })
+  console.log('Remaining todo count:', response.data)
+  return response.data.activeTodoCount
+}
+
+export async function sendEmailToUser(idToken: string, request: EmailNotificationRequest): Promise<void> {
+  console.log('Sending notification email to user: ', JSON.stringify(request))
+
+  await Axios.patch(`${apiEndpoint}/notification`, JSON.stringify(request), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    }
+  })
 }
 
 export async function createTodo(

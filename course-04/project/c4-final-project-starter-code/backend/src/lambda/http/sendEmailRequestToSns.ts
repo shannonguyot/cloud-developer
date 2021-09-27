@@ -4,20 +4,16 @@ import * as middy from 'middy'
 import { cors } from 'middy/middlewares'
 
 import { userExists } from '../../business-logic/users'
-import { queryByTodoId, checkTodo, updateTodo } from '../../business-logic/todos'
+import { publishMessage } from '../../business-logic/sns'
 import { User } from '../../models/UserItem'
-import { UpdateTodoRequest } from '../../requests/UpdateTodoRequest'
+import { EmailNotificationRequest } from '../../requests/EmailNotificationRequest'
 import { createLogger } from '../../utils/logger'
 
-const logger = createLogger('update-todo')
+const logger = createLogger('email-request')
 
 export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
 
   logger.info('Caller event', event)
-
-  const todoId = event.pathParameters.todoId
-  const updatedTodo: UpdateTodoRequest = JSON.parse(event.body)
-
   logger.info('Checking for user ...')
   let user: User
 
@@ -43,29 +39,23 @@ export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGat
     }
   }
 
-  logger.info(`Fetching todo by todo id of ${todoId}`)
-  const todoAttrMap: any = await queryByTodoId(todoId)
+  const message: EmailNotificationRequest = JSON.parse(event.body)
 
-  if (!todoAttrMap) {
+  logger.info('Message: ', JSON.stringify(message))
+
+  const result : boolean = await publishMessage(JSON.stringify(message))
+
+  if(!result) {
+    logger.error('Error publishing to SNS')
     return {
-      statusCode: 404,
-      body: JSON.stringify({ error: "No todos found for the provided id" })
+      statusCode: 500,
+      body: JSON.stringify({
+        error: 'Unable to publish message to SNS'
+      })
     }
   }
 
-  logger.info('Todo was fetched; updating values...', {fetchedTodo: todoAttrMap, updateRequest: updatedTodo})
-
-  if(updatedTodo.name != "" || updatedTodo.dueDate != "") {
-    logger.info('Name and/or due date being updated...')
-    await updateTodo(user.id, todoAttrMap.createdAt, updatedTodo.name, updatedTodo.dueDate)
-  }
-  else{
-    logger.info('Done status being updated...')
-    await checkTodo(user.id, todoAttrMap.createdAt, updatedTodo.done)
-  }
-
-  logger.info('Update operation complete; returning response.')
-
+  logger.info('SNS publish succeeded: ', JSON.stringify(message))
   return {
     statusCode: 200,
      body: ``

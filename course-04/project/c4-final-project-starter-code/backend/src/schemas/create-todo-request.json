@@ -10,11 +10,16 @@
       "dueDate": {
         "type": "string",
         "minLength": 1
+      },
+      "userEmail": {
+        "type": "string",
+        "minLength": 1
       }
     },
     "required": [
       "name",
-      "dueDate"
+      "dueDate",
+      "userEmail"
     ],
     "additionalProperties": false
   }

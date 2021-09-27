@@ -14,7 +14,7 @@ import {
   Loader
 } from 'semantic-ui-react'
 
-import { createTodo, deleteTodo, getTodos, patchTodo } from '../api/todos-api'
+import { createTodo, deleteTodo, getTodos, patchTodo, getRemainingTodoCount, sendEmailToUser } from '../api/todos-api'
 import Auth from '../auth/Auth'
 import { Todo } from '../types/Todo'
 
@@ -26,14 +26,16 @@ interface TodosProps {
 interface TodosState {
   todos: Todo[]
   newTodoName: string
-  loadingTodos: boolean
+  loadingTodos: boolean,
+  activeTodoCount: number
 }
 
 export class Todos extends React.PureComponent<TodosProps, TodosState> {
   state: TodosState = {
     todos: [],
     newTodoName: '',
-    loadingTodos: true
+    loadingTodos: true,
+    activeTodoCount: 0
   }
 
   handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,11 +51,14 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
       const dueDate = this.calculateDueDate()
       const newTodo = await createTodo(this.props.auth.getIdToken(), {
         name: this.state.newTodoName,
-        dueDate
+        dueDate,
+        userEmail: this.props.auth.email
       })
+      const activeTodoCount = await getRemainingTodoCount(this.props.auth.getIdToken())
       this.setState({
         todos: [...this.state.todos, newTodo],
-        newTodoName: ''
+        newTodoName: '',
+        activeTodoCount: activeTodoCount
       })
     } catch {
       alert('Todo creation failed')
@@ -63,8 +68,10 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
   onTodoDelete = async (todoId: string) => {
     try {
       await deleteTodo(this.props.auth.getIdToken(), todoId)
+      const activeTodoCount = await getRemainingTodoCount(this.props.auth.getIdToken())
       this.setState({
-        todos: this.state.todos.filter(todo => todo.todoId != todoId)
+        todos: this.state.todos.filter(todo => todo.todoId != todoId),
+        activeTodoCount: activeTodoCount
       })
     } catch {
       alert('Todo deletion failed')
@@ -74,37 +81,49 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
   onTodoCheck = async (pos: number) => {
     try {
       const todo = this.state.todos[pos]
+
       await patchTodo(this.props.auth.getIdToken(), todo.todoId, {
-        name: todo.name,
-        dueDate: todo.dueDate,
+        name: "",
+        dueDate: "",
         done: !todo.done
       })
+
+      const activeTodoCount = await getRemainingTodoCount(this.props.auth.getIdToken())
+
+      if(!todo.done) {
+        console.log('Triggering email to user...')
+        await sendEmailToUser(this.props.auth.getIdToken(), {todoName: todo.name, email: this.props.auth.email})
+      }
+
       this.setState({
         todos: update(this.state.todos, {
           [pos]: { done: { $set: !todo.done } }
-        })
+        }),
+        activeTodoCount: activeTodoCount
       })
     } catch {
-      alert('Todo deletion failed')
+      alert('Todo checking failed')
     }
   }
 
   async componentDidMount() {
     try {
       const todos = await getTodos(this.props.auth.getIdToken())
+      const activeTodoCount = await getRemainingTodoCount(this.props.auth.getIdToken())
       this.setState({
         todos,
-        loadingTodos: false
+        loadingTodos: false,
+        activeTodoCount: activeTodoCount
       })
     } catch (e) {
-      alert(`Failed to fetch todos: ${e.message}`)
+      alert(`Failed to fetch todos and todo count: ${e.message}`)
     }
   }
 
   render() {
     return (
       <div>
-        <Header as="h1">TODOs</Header>
+        <Header as="h1">TODOs ({this.state.activeTodoCount} active)</Header>
 
         {this.renderCreateTodoInput()}
 
