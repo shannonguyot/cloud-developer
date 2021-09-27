@@ -1,5 +1,4 @@
-service:
-  name: serverless-todo-app
+service: capstone-project
 
 plugins:
   - serverless-webpack
@@ -8,6 +7,7 @@ plugins:
 provider:
   name: aws
   runtime: nodejs12.x
+  lambdaHashingVersion: 20201221
 
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-2'}
@@ -19,17 +19,20 @@ provider:
   environment:
     TODOS_TABLE: Todos-${self:provider.stage}
     USERS_TABLE: Users-${self:provider.stage}
+    EMAIL_EVENTS_TABLE: Email-Events-${self:provider.stage}
     TODO_ID_INDEX: TodoIdIndex
-    ATTACHMENT_S3_BUCKET: course-04-project-dh3o45-${self:provider.stage}
+    ATTACHMENT_S3_BUCKET: capstone-project-attachments-dh3o45-${self:provider.stage}
+    THUMBNAILS_S3_BUCKET: capstone-project-resized-dh3o45-${self:provider.stage}
     SIGNED_URL_EXPIRATION: 300
 
 custom:
+  snsTopicName: capstone-notifications-topic-dh3o45-${self:provider.stage}
   documentation:
     api:
       info:
         version: v1.0.0
-        title: Todos API
-        description: Serverless application for todos
+        title: Capstone Todos API
+        description: Serverless application for todos (Capstone project)
 
 functions:
 
@@ -54,6 +57,24 @@ functions:
           - dynamodb:Query
         Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
 
+  GetRemainingTodoCount:
+    handler: src/lambda/http/getRemainingTodoCount.handler
+    events:
+      - http:
+          method: get
+          authorizer: Auth
+          path: count
+          cors: true
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+
   CreateTodo:
     handler: src/lambda/http/createTodo.handler
     events:
@@ -63,7 +84,7 @@ functions:
           path: todos
           cors: true
           request:
-            schema:
+            schemas:
               application/json: ${file(src/schemas/create-todo-request.json)}
     iamRoleStatements:
       - Effect: Allow
@@ -75,6 +96,10 @@ functions:
         Action:
           - dynamodb:PutItem
         Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+      - Effect: Allow
+        Action:
+          - ses:VerifyEmailIdentity
+        Resource: "*"
 
   UpdateTodo:
     handler: src/lambda/http/updateTodo.handler
@@ -85,7 +110,7 @@ functions:
           path: todos/{todoId}
           cors: true
           request:
-            schema:
+            schemas:
               application/json: ${file(src/schemas/update-todo-request.json)}
     iamRoleStatements:
       - Effect: Allow
@@ -101,7 +126,49 @@ functions:
         Action:
           - dynamodb:Query
         Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}/index/*
+  
+  SendEmailRequestToSns:
+    handler: src/lambda/http/sendEmailRequestToSns.handler
+    environment:
+      TOPIC_ARN: !Ref NotificationsTopic
+    events:
+      - http:
+          method: patch
+          authorizer: Auth
+          path: notification
+          cors: true
+          request:
+            schemas:
+              application/json: ${file(src/schemas/send-email-request.json)}
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - sns:Publish
+        Resource: !Ref NotificationsTopic
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}
 
+  SendEmailToUser:
+    handler: src/lambda/http/sendEmailToUser.handler
+    environment:
+      SOURCE_EMAIL: shannonguyot97@gmail.com
+      EVENT_EXP: 900
+    events:
+      - sns:
+          arn: !Ref NotificationsTopic
+          topicName: ${self:custom.snsTopicName}
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - ses:sendEmail
+        Resource: arn:aws:ses:${self:provider.region}:*:identity/*
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+          - dynamodb:PutItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.EMAIL_EVENTS_TABLE}
 
   DeleteTodo:
     handler: src/lambda/http/deleteTodo.handler
@@ -203,6 +270,25 @@ resources:
               KeyType: HASH
             Projection:
               ProjectionType: ALL
+  
+    EmailEventsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: removalTime
+            AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: removalTime
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: removalTime
+          Enabled: true
+        TableName: ${self:provider.environment.EMAIL_EVENTS_TABLE}
 
     AttachmentsBucket:
       Type: AWS::S3::Bucket
@@ -236,3 +322,9 @@ resources:
               Action: 's3:GetObject'
               Resource: 'arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET}/*'
         Bucket: !Ref AttachmentsBucket
+
+    NotificationsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: Email notification topic
+        TopicName: ${self:custom.snsTopicName}
