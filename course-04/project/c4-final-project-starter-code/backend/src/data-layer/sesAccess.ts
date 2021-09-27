@@ -10,22 +10,16 @@ export class SesAccess {
   }
 
   async verifyEmailAddress(email: string) : Promise<boolean> {
-    let success: boolean = false
     const params = {
       EmailAddress: email
     };
 
-    await this.ses.verifyEmailIdentity(params, (err) => {
-      if(!err) {
-        success = true
-      }
-    }).promise()
+    await this.ses.verifyEmailIdentity(params).promise()
 
-    return success
+    return true
   }
 
   async sendEmail(destinationEmail: string, message: string, subject: string) : Promise<boolean> {
-    let success: boolean = false
     const params = {
       Destination: {
         ToAddresses: [destinationEmail],
@@ -39,12 +33,8 @@ export class SesAccess {
       Source: process.env.SOURCE_EMAIL,
     };
   
-    await this.ses.sendEmail(params, (err) => {
-      if (err) {
-        success = true
-      }
-    }).promise()
+    await this.ses.sendEmail(params).promise()
 
-    return success
+    return true
   }
 }
