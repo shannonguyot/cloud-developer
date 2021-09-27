@@ -10,17 +10,11 @@ export class SnsAccess {
   }
 
   async publishMessage(message: string) : Promise<boolean> {
-    let success : boolean = false
-
     await this.sns.publish({
       TopicArn: process.env.TOPIC_ARN,
       Message: message
-    }, function(err) {
-      if(!err) {
-        success = true
-      }
     }).promise()
 
-    return success
+    return true
   }
 }
